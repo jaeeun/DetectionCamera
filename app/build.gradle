@@ -23,7 +23,7 @@ android {
     defaultConfig {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         applicationId "com.gongdol.detectioncamera"
-        minSdkVersion 21
+        minSdkVersion 28
         targetSdkVersion 33
         versionCode 1
         versionName "1.0.0"

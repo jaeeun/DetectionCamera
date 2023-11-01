@@ -126,6 +126,10 @@ class ObjectDetectorHelper(
         // Preprocess the image and convert it into a TensorImage for detection.
         val tensorImage = imageProcessor.process(TensorImage.fromBitmap(image))
 
+        Log.i(TAG,"image       w:"+image.width+" h:"+image.height)
+        Log.i(TAG,"tensorImage w:"+tensorImage.width+" h:"+tensorImage.height)
+
+
         val results = objectDetector?.detect(tensorImage)
         inferenceTime = SystemClock.uptimeMillis() - inferenceTime
         objectDetectorListener?.onResults(
@@ -134,7 +138,17 @@ class ObjectDetectorHelper(
             tensorImage.height,
             tensorImage.width)
 
+    }
 
+    fun GetDetectionResults(image: Bitmap, imageRotation: Int): List<Detection>?{
+
+        val imageProcessor =
+            ImageProcessor.Builder()
+                .add(Rot90Op(-imageRotation / 90))
+                .build()
+
+        val tensorImage = imageProcessor.process(TensorImage.fromBitmap(image))
+        return objectDetector?.detect(tensorImage)
     }
 
     interface DetectorListener {

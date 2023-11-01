@@ -16,13 +16,13 @@
 
 package com.gongdol.detectioncamera.fragments
 
+//import androidx.window.WindowManager
+
 import android.annotation.SuppressLint
 import android.content.*
 import android.content.res.Configuration
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
+import android.graphics.*
+import android.graphics.ImageDecoder.decodeBitmap
 import android.graphics.drawable.ColorDrawable
 import android.hardware.display.DisplayManager
 import android.net.Uri
@@ -37,33 +37,34 @@ import android.view.ViewGroup
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.camera.core.*
+import androidx.camera.core.Camera
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.concurrent.futures.await
+import androidx.core.content.ContextCompat
 import androidx.core.view.setPadding
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.navigation.Navigation
-//import androidx.window.WindowManager
 import androidx.window.layout.WindowInfoTracker
 import androidx.window.layout.WindowMetricsCalculator
-import com.gongdol.detectioncamera.fragments.PermissionsFragment
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.RequestOptions
 import com.gongdol.detectioncamera.KEY_EVENT_ACTION
 import com.gongdol.detectioncamera.KEY_EVENT_EXTRA
 import com.gongdol.detectioncamera.R
+import com.gongdol.detectioncamera.TAG
 import com.gongdol.detectioncamera.databinding.CameraUiContainerBinding
 import com.gongdol.detectioncamera.databinding.FragmentCameraBinding
+import com.gongdol.detectioncamera.objectdetection.ObjectDetectorHelper
+import com.gongdol.detectioncamera.objectdetection.OverlayView
 import com.gongdol.detectioncamera.utils.ANIMATION_FAST_MILLIS
 import com.gongdol.detectioncamera.utils.ANIMATION_SLOW_MILLIS
 import com.gongdol.detectioncamera.utils.MediaStoreUtils
 import com.gongdol.detectioncamera.utils.simulateClick
-import com.bumptech.glide.Glide
-import com.bumptech.glide.request.RequestOptions
-import com.gongdol.detectioncamera.TAG
-import com.gongdol.detectioncamera.objectdetection.ObjectDetectorHelper
 import kotlinx.coroutines.launch
 import org.tensorflow.lite.task.vision.detector.Detection
-
+import java.io.File
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
@@ -174,11 +175,93 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         return fragmentCameraBinding.root
     }
 
-    private fun AddCanvas(uri: Uri?){
-//        Glide.with(requireContext())
-//            .load(uri)
-//            .apply(RequestOptions.circleCropTransform())
-//            .into(photoViewButton)
+    private fun AddCanvas(uri: Uri?):Uri{
+        Glide.with(requireContext())
+            .load(uri)
+            .apply(RequestOptions.circleCropTransform())
+
+        var bitmap:Bitmap?
+        if(Build.VERSION.SDK_INT >=28){
+            val source = ImageDecoder.createSource(requireContext().contentResolver, uri!!)
+            bitmap = ImageDecoder.decodeBitmap(source)
+        }else{
+            bitmap = MediaStore.Images.Media.getBitmap(requireContext().contentResolver, uri!!)
+        }
+
+        val copyBitmap = bitmap?.copy(Bitmap.Config.ARGB_8888,true)
+
+        val canvas = Canvas(copyBitmap!!)
+
+        val imageRotation = (5-fragmentCameraBinding.viewFinder.display.rotation)%4*90
+
+        val results = objectDetectorHelper.GetDetectionResults(copyBitmap, imageRotation)
+
+        var boxPaint = Paint()
+        var textBackgroundPaint = Paint()
+        var textPaint = Paint()
+
+        textBackgroundPaint.color = Color.BLACK
+        textBackgroundPaint.style = Paint.Style.FILL
+        textBackgroundPaint.textSize = 50f
+
+        textPaint.color = Color.WHITE
+        textPaint.style = Paint.Style.FILL
+        textPaint.textSize = 50f
+
+        boxPaint.color = ContextCompat.getColor(context!!, R.color.bounding_box_color)
+        boxPaint.strokeWidth = 8F
+        boxPaint.style = Paint.Style.STROKE
+
+
+        var bounds = Rect()
+        val BOUNDING_RECT_TEXT_PADDING = 8
+
+        if(results!=null) {
+            Log.i(TAG,"results : "+results)
+            for (result in results) {
+                val boundingBox = result.boundingBox
+
+                val scaleFactor = 0.9f//max(fragmentCameraBinding.viewFinder.width * 1f / copyBitmap.width, fragmentCameraBinding.viewFinder.height * 1f / copyBitmap.height)
+                val top = boundingBox.top * scaleFactor
+                val bottom = boundingBox.bottom * scaleFactor
+                val left = boundingBox.left * scaleFactor
+                val right = boundingBox.right * scaleFactor
+
+                // Draw bounding box around detected objects
+                val drawableRect = RectF(left, top, right, bottom)
+
+                val r = abs(result.categories[0].index / 10 % 10) * 25
+                val g = abs(result.categories[0].index % 60 - 30) * 8
+                val b = abs(result.categories[0].index % 10) * 25
+                boxPaint.color = Color.rgb(r, g, b)
+                Log.i(TAG, "result type : " + r + ", " + g + ", " + b)
+                canvas.drawRect(drawableRect, boxPaint)
+
+                // Create text to display alongside detected objects
+                val drawableText =
+                    result.categories[0].label + " " +
+                            String.format("%.2f", result.categories[0].score)
+
+                // Draw rect behind display text
+                textBackgroundPaint.getTextBounds(drawableText, 0, drawableText.length, bounds)
+                val textWidth = bounds.width()
+                val textHeight = bounds.height()
+                canvas.drawRect(
+                    left,
+                    top,
+                    left + textWidth + BOUNDING_RECT_TEXT_PADDING,
+                    top + textHeight + BOUNDING_RECT_TEXT_PADDING,
+                    textBackgroundPaint
+                )
+
+                // Draw text for detected object
+                canvas.drawText(drawableText, left, top + bounds.height(), textPaint)
+            }
+        }
+
+        val path: String =
+            MediaStore.Images.Media.insertImage(requireContext().contentResolver, copyBitmap, "Title", null)
+        return Uri.parse(path)
     }
 
     private fun setGalleryThumbnail(filename: String) {
@@ -237,6 +320,13 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                 setUpCamera()
             }
         }
+
+//        val bitmap = fragmentCameraBinding.viewFinder.bitmap
+//        fragmentCameraBinding.overlayPreview.setImageBitmap(bitmap)
+//        fragmentCameraBinding.overlayPreview.visibility = View.VISIBLE
+//        cameraExecutor.shutdown()
+//        fragmentCameraBinding.viewFinder.visibility = View.GONE
+
 
         fragmentCameraBinding.ThresholdSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             // override the onProgressChanged method to perform operations
@@ -368,7 +458,8 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
 
                         Log.i(TAG,"image       height:"+image.height+"  width:"+image.width)
 
-                        detectObjects(image)
+                        if(_fragmentCameraBinding!=null)
+                            detectObjects(image)
 
 
                     }
@@ -558,12 +649,17 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                         val savedUri = output.savedUri
                         Log.d(TAG, "Photo capture succeeded: $savedUri")
 
-                       AddCanvas(savedUri)
+                       val newUri = AddCanvas(savedUri)
+
+                        val file = File(savedUri?.getPath())
+                        if(file.exists()){
+                            file.delete()
+                        }
 
                         // We can only change the foreground Drawable using API level 23+ API
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                             // Update the gallery thumbnail with latest picture taken
-                            setGalleryThumbnail(savedUri.toString())
+                            setGalleryThumbnail(newUri.toString())
                         }
 
                         // Implicit broadcasts will be ignored for devices running API level >= 24
@@ -572,7 +668,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                             // Suppress deprecated Camera usage needed for API level 23 and below
                             @Suppress("DEPRECATION")
                             requireActivity().sendBroadcast(
-                                    Intent(android.hardware.Camera.ACTION_NEW_PICTURE, savedUri)
+                                    Intent(android.hardware.Camera.ACTION_NEW_PICTURE, newUri)
                             )
                         }
                     }
@@ -623,6 +719,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
             }
         }
     }
+
 
     /** Enabled or disabled a button to switch cameras depending on the available cameras */
     private fun updateCameraSwitchButton() {
@@ -741,11 +838,11 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         // Pass Bitmap and rotation to the object detector helper for processing and detection
         objectDetectorHelper.detect(bitmapBuffer, imageRotation)
 
-        val canvas = Canvas(bitmapBuffer)
-        val paint = Paint()
-        paint.setColor(Color.BLACK)
-        paint.setTextSize(10f)
-        canvas.drawText("TEST TEST", 200f, 200f,paint)
+//        val canvas = Canvas(bitmapBuffer)
+//        val paint = Paint()
+//        paint.setColor(Color.BLACK)
+//        paint.setTextSize(10f)
+//        canvas.drawText("TEST TEST", 200f, 200f,paint)
     }
 
     companion object {
@@ -767,17 +864,20 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
     ) {
         Log.i(TAG,"onResults  imageHeight:"+ imageHeight+"  imageWidth:"+imageWidth)
 
-        // Pass necessary information to OverlayView for drawing on the canvas
-        fragmentCameraBinding.overlay.setResults(
-            results ?: LinkedList<Detection>(),
-            imageHeight,
-            imageWidth
-        )
+        if(_fragmentCameraBinding!=null) {
+            // Pass necessary information to OverlayView for drawing on the canvas
+            fragmentCameraBinding.overlay.setResults(
+                results ?: LinkedList<Detection>(),
+                imageHeight,
+                imageWidth
+            )
+
 
         // Set text of detected Count
 //        updateDetectCount(results?.size!!)
 
         // Force a redraw
         fragmentCameraBinding.overlay.invalidate()
+        }
     }
 }

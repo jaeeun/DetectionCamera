@@ -27,7 +27,6 @@
         android:layout_height="wrap_content"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:text="Detect Count : 0 / 5"
         android:textSize="20dp"
         android:textColor="@color/green"
         android:textStyle="bold"
@@ -38,6 +37,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    
     <com.gongdol.detectioncamera.objectdetection.OverlayView
         android:id="@+id/overlay"
         android:layout_height="match_parent"
