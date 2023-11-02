@@ -137,7 +137,7 @@ class GalleryFragment internal constructor() : Fragment() {
 
                             // Send relevant broadcast to notify other apps of deletion
                             MediaScannerConnection.scanFile(
-                                view.context, arrayOf(mediaFile.absolutePath), null, null
+                                    view.context, arrayOf(mediaFile.absolutePath), null, null
                             )
 
                             // Notify our view pager

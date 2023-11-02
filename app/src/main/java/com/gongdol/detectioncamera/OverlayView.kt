@@ -130,6 +130,11 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
         // PreviewView is in FILL_START mode. So we need to scale up the bounding box to match with
         // the size that the captured images will be displayed.
         scaleFactor = max(width * 1f / imageWidth, height * 1f / imageHeight)
+
+
+//        Log.i(TAG,"setResults  width :"+width+"  height : "+height)
+//        Log.i(TAG,"setResults  image w : "+imageWidth+"  h : "+imageHeight)
+//        Log.i(TAG,"setResults   scaleFactor : "+scaleFactor)
     }
 
     companion object {

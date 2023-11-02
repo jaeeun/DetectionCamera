@@ -126,8 +126,8 @@ class ObjectDetectorHelper(
         // Preprocess the image and convert it into a TensorImage for detection.
         val tensorImage = imageProcessor.process(TensorImage.fromBitmap(image))
 
-        Log.i(TAG,"image       w:"+image.width+" h:"+image.height)
-        Log.i(TAG,"tensorImage w:"+tensorImage.width+" h:"+tensorImage.height)
+//        Log.i(TAG,"image       w:"+image.width+" h:"+image.height)
+//        Log.i(TAG,"tensorImage w:"+tensorImage.width+" h:"+tensorImage.height)
 
 
         val results = objectDetector?.detect(tensorImage)

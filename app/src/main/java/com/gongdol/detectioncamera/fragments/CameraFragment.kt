@@ -22,7 +22,6 @@ import android.annotation.SuppressLint
 import android.content.*
 import android.content.res.Configuration
 import android.graphics.*
-import android.graphics.ImageDecoder.decodeBitmap
 import android.graphics.drawable.ColorDrawable
 import android.hardware.display.DisplayManager
 import android.net.Uri
@@ -57,22 +56,22 @@ import com.gongdol.detectioncamera.TAG
 import com.gongdol.detectioncamera.databinding.CameraUiContainerBinding
 import com.gongdol.detectioncamera.databinding.FragmentCameraBinding
 import com.gongdol.detectioncamera.objectdetection.ObjectDetectorHelper
-import com.gongdol.detectioncamera.objectdetection.OverlayView
 import com.gongdol.detectioncamera.utils.ANIMATION_FAST_MILLIS
 import com.gongdol.detectioncamera.utils.ANIMATION_SLOW_MILLIS
 import com.gongdol.detectioncamera.utils.MediaStoreUtils
 import com.gongdol.detectioncamera.utils.simulateClick
 import kotlinx.coroutines.launch
 import org.tensorflow.lite.task.vision.detector.Detection
-import java.io.File
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
+import java.time.LocalDateTime
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+
 
 /** Helper type alias used for analysis use case callbacks */
 typealias LumaListener = (luma: Double) -> Unit
@@ -262,6 +261,100 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         val path: String =
             MediaStore.Images.Media.insertImage(requireContext().contentResolver, copyBitmap, "Title", null)
         return Uri.parse(path)
+    }
+
+    private fun DetectedCaptureImage(bitmap :Bitmap, imageRotation:Int){
+        val canvas = Canvas(bitmap!!)
+
+//        val imageRotation = (5-fragmentCameraBinding.viewFinder.display.rotation)%4*90
+
+        val results = objectDetectorHelper.GetDetectionResults(bitmap, 0)
+
+        var boxPaint = Paint()
+        var textBackgroundPaint = Paint()
+        var textPaint = Paint()
+
+        textBackgroundPaint.color = Color.BLACK
+        textBackgroundPaint.style = Paint.Style.FILL
+        textBackgroundPaint.textSize = 50f
+
+        textPaint.color = Color.WHITE
+        textPaint.style = Paint.Style.FILL
+        textPaint.textSize = 50f
+
+        boxPaint.color = ContextCompat.getColor(context!!, R.color.bounding_box_color)
+        boxPaint.strokeWidth = 8F
+        boxPaint.style = Paint.Style.STROKE
+
+
+        var bounds = Rect()
+        val BOUNDING_RECT_TEXT_PADDING = 8
+
+        if(results!=null) {
+            Log.i(TAG,"results : "+results)
+            for (result in results) {
+                val boundingBox = result.boundingBox
+
+                val scaleFactor = 1f
+
+                val top = boundingBox.top * scaleFactor
+                val bottom = boundingBox.bottom * scaleFactor
+                val left = boundingBox.left * scaleFactor
+                val right = boundingBox.right * scaleFactor
+
+                // Draw bounding box around detected objects
+                val drawableRect = RectF(left, top, right, bottom)
+
+                val r = abs(result.categories[0].index / 10 % 10) * 25
+                val g = abs(result.categories[0].index % 60 - 30) * 8
+                val b = abs(result.categories[0].index % 10) * 25
+                boxPaint.color = Color.rgb(r, g, b)
+                Log.i(TAG, "result type : " + r + ", " + g + ", " + b)
+                canvas.drawRect(drawableRect, boxPaint)
+
+                // Create text to display alongside detected objects
+                val drawableText =
+                    result.categories[0].label + " " +
+                            String.format("%.2f", result.categories[0].score)
+
+                // Draw rect behind display text
+                textBackgroundPaint.getTextBounds(drawableText, 0, drawableText.length, bounds)
+                val textWidth = bounds.width()
+                val textHeight = bounds.height()
+                canvas.drawRect(
+                    left,
+                    top,
+                    left + textWidth + BOUNDING_RECT_TEXT_PADDING,
+                    top + textHeight + BOUNDING_RECT_TEXT_PADDING,
+                    textBackgroundPaint
+                )
+
+                // Draw text for detected object
+                canvas.drawText(drawableText, left, top + bounds.height(), textPaint)
+            }
+        }
+
+        val dateAndtime: LocalDateTime = LocalDateTime.now()
+
+        val path: String =
+            MediaStore.Images.Media.insertImage(requireContext().contentResolver, bitmap, "detection_camera_"+dateAndtime, null)
+        val uri = Uri.parse(path)
+
+        // We can only change the foreground Drawable using API level 23+ API
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // Update the gallery thumbnail with latest picture taken
+            setGalleryThumbnail(uri.toString())
+        }
+
+        // Implicit broadcasts will be ignored for devices running API level >= 24
+        // so if you only target API level 24+ you can remove this statement
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+            // Suppress deprecated Camera usage needed for API level 23 and below
+            @Suppress("DEPRECATION")
+            requireActivity().sendBroadcast(
+                Intent(android.hardware.Camera.ACTION_NEW_PICTURE, uri)
+            )
+        }
     }
 
     private fun setGalleryThumbnail(filename: String) {
@@ -638,41 +731,65 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                         contentValues)
                     .build()
 
-                // Setup image capture listener which is triggered after photo has been taken
-                imageCapture.takePicture(
-                        outputOptions, cameraExecutor, object : ImageCapture.OnImageSavedCallback {
-                    override fun onError(exc: ImageCaptureException) {
-                        Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+                imageCapture.takePicture(cameraExecutor, object :
+                    ImageCapture.OnImageCapturedCallback() {
+                    override fun onCaptureSuccess(image: ImageProxy) {
+
+                        Log.i(TAG,"imageCapture onCaptureSuccess")
+                        //get bitmap from image
+                        val bitmap = imageProxyToBitmap(image)
+
+                        DetectedCaptureImage(bitmap, image.imageInfo.rotationDegrees)
+
+
+
+                        super.onCaptureSuccess(image)
                     }
 
-                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        val savedUri = output.savedUri
-                        Log.d(TAG, "Photo capture succeeded: $savedUri")
-
-                       val newUri = AddCanvas(savedUri)
-
-                        val file = File(savedUri?.getPath())
-                        if(file.exists()){
-                            file.delete()
-                        }
-
-                        // We can only change the foreground Drawable using API level 23+ API
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            // Update the gallery thumbnail with latest picture taken
-                            setGalleryThumbnail(newUri.toString())
-                        }
-
-                        // Implicit broadcasts will be ignored for devices running API level >= 24
-                        // so if you only target API level 24+ you can remove this statement
-                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-                            // Suppress deprecated Camera usage needed for API level 23 and below
-                            @Suppress("DEPRECATION")
-                            requireActivity().sendBroadcast(
-                                    Intent(android.hardware.Camera.ACTION_NEW_PICTURE, newUri)
-                            )
-                        }
+                    override fun onError(exception: ImageCaptureException) {
+                        super.onError(exception)
                     }
                 })
+
+                // Setup image capture listener which is triggered after photo has been taken
+//                imageCapture.takePicture(
+//                        outputOptions, cameraExecutor, object : ImageCapture.OnImageSavedCallback {
+//                    override fun onError(exc: ImageCaptureException) {
+//                        Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+//                    }
+//
+//                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+//                        Log.i(TAG,"imageCapture onImageSaved")
+//
+//                        if(true) return
+//
+//                        val savedUri = output.savedUri
+//                        Log.d(TAG, "Photo capture succeeded: $savedUri")
+//
+////                       val newUri = AddCanvas(savedUri)
+////
+////                        val file = File(savedUri?.getPath())
+////                        if(file.exists()){
+////                            file.delete()
+////                        }
+//
+//                        // We can only change the foreground Drawable using API level 23+ API
+//                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+//                            // Update the gallery thumbnail with latest picture taken
+//                            setGalleryThumbnail(savedUri.toString())
+//                        }
+//
+//                        // Implicit broadcasts will be ignored for devices running API level >= 24
+//                        // so if you only target API level 24+ you can remove this statement
+//                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+//                            // Suppress deprecated Camera usage needed for API level 23 and below
+//                            @Suppress("DEPRECATION")
+//                            requireActivity().sendBroadcast(
+//                                    Intent(android.hardware.Camera.ACTION_NEW_PICTURE, savedUri)
+//                            )
+//                        }
+//                    }
+//                })
 
                 // We can only change the foreground Drawable using API level 23+ API
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -720,6 +837,33 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         }
     }
 
+    /**
+     *  convert image proxy to bitmap
+     *  @param image
+     */
+    private fun imageProxyToBitmap(image: ImageProxy): Bitmap {
+        val planeProxy = image.planes[0]
+        val buffer: ByteBuffer = planeProxy.buffer
+        val bytes = ByteArray(buffer.remaining())
+        buffer.get(bytes)
+
+//        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size).copy(Bitmap.Config.ARGB_8888, true)
+
+        // Copy out RGB bits to the shared bitmap buffer
+        // bitmapBuffer.
+//        image.use { bitmapBuffer.copyPixelsFromBuffer(image.planes[0].buffer) }
+//        val imageRotation = (5-fragmentCameraBinding.viewFinder.display.rotation)%4*90
+
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size).copy(Bitmap.Config.ARGB_8888, true)
+
+        return rotate(bitmap, image.imageInfo.rotationDegrees)
+    }
+
+    private fun rotate(bitmap: Bitmap, degree: Int) : Bitmap {
+        val matrix = Matrix()
+        matrix.postRotate(degree.toFloat())
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix,true)
+    }
 
     /** Enabled or disabled a button to switch cameras depending on the available cameras */
     private fun updateCameraSwitchButton() {
@@ -833,16 +977,11 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
 
         val imageRotation = (5-fragmentCameraBinding.viewFinder.display.rotation)%4*90
 
-        Log.i(TAG,"rotation imageRotation                                    :"+imageRotation)
+        Log.i(TAG,"rotation imageRotation :"+imageRotation)
 
         // Pass Bitmap and rotation to the object detector helper for processing and detection
         objectDetectorHelper.detect(bitmapBuffer, imageRotation)
 
-//        val canvas = Canvas(bitmapBuffer)
-//        val paint = Paint()
-//        paint.setColor(Color.BLACK)
-//        paint.setTextSize(10f)
-//        canvas.drawText("TEST TEST", 200f, 200f,paint)
     }
 
     companion object {
