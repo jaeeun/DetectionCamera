@@ -174,99 +174,12 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         return fragmentCameraBinding.root
     }
 
-    private fun AddCanvas(uri: Uri?):Uri{
-        Glide.with(requireContext())
-            .load(uri)
-            .apply(RequestOptions.circleCropTransform())
-
-        var bitmap:Bitmap?
-        if(Build.VERSION.SDK_INT >=28){
-            val source = ImageDecoder.createSource(requireContext().contentResolver, uri!!)
-            bitmap = ImageDecoder.decodeBitmap(source)
-        }else{
-            bitmap = MediaStore.Images.Media.getBitmap(requireContext().contentResolver, uri!!)
-        }
-
-        val copyBitmap = bitmap?.copy(Bitmap.Config.ARGB_8888,true)
-
-        val canvas = Canvas(copyBitmap!!)
-
-        val imageRotation = (5-fragmentCameraBinding.viewFinder.display.rotation)%4*90
-
-        val results = objectDetectorHelper.GetDetectionResults(copyBitmap, imageRotation)
-
-        var boxPaint = Paint()
-        var textBackgroundPaint = Paint()
-        var textPaint = Paint()
-
-        textBackgroundPaint.color = Color.BLACK
-        textBackgroundPaint.style = Paint.Style.FILL
-        textBackgroundPaint.textSize = 50f
-
-        textPaint.color = Color.WHITE
-        textPaint.style = Paint.Style.FILL
-        textPaint.textSize = 50f
-
-        boxPaint.color = ContextCompat.getColor(context!!, R.color.bounding_box_color)
-        boxPaint.strokeWidth = 8F
-        boxPaint.style = Paint.Style.STROKE
-
-
-        var bounds = Rect()
-        val BOUNDING_RECT_TEXT_PADDING = 8
-
-        if(results!=null) {
-            Log.i(TAG,"results : "+results)
-            for (result in results) {
-                val boundingBox = result.boundingBox
-
-                val scaleFactor = 0.9f//max(fragmentCameraBinding.viewFinder.width * 1f / copyBitmap.width, fragmentCameraBinding.viewFinder.height * 1f / copyBitmap.height)
-                val top = boundingBox.top * scaleFactor
-                val bottom = boundingBox.bottom * scaleFactor
-                val left = boundingBox.left * scaleFactor
-                val right = boundingBox.right * scaleFactor
-
-                // Draw bounding box around detected objects
-                val drawableRect = RectF(left, top, right, bottom)
-
-                val r = abs(result.categories[0].index / 10 % 10) * 25
-                val g = abs(result.categories[0].index % 60 - 30) * 8
-                val b = abs(result.categories[0].index % 10) * 25
-                boxPaint.color = Color.rgb(r, g, b)
-                Log.i(TAG, "result type : " + r + ", " + g + ", " + b)
-                canvas.drawRect(drawableRect, boxPaint)
-
-                // Create text to display alongside detected objects
-                val drawableText =
-                    result.categories[0].label + " " +
-                            String.format("%.2f", result.categories[0].score)
-
-                // Draw rect behind display text
-                textBackgroundPaint.getTextBounds(drawableText, 0, drawableText.length, bounds)
-                val textWidth = bounds.width()
-                val textHeight = bounds.height()
-                canvas.drawRect(
-                    left,
-                    top,
-                    left + textWidth + BOUNDING_RECT_TEXT_PADDING,
-                    top + textHeight + BOUNDING_RECT_TEXT_PADDING,
-                    textBackgroundPaint
-                )
-
-                // Draw text for detected object
-                canvas.drawText(drawableText, left, top + bounds.height(), textPaint)
-            }
-        }
-
-        val path: String =
-            MediaStore.Images.Media.insertImage(requireContext().contentResolver, copyBitmap, "Title", null)
-        return Uri.parse(path)
-    }
-
+    //To draw bounding box on Captured images
     private fun DetectedCaptureImage(bitmap :Bitmap, imageRotation:Int){
         val canvas = Canvas(bitmap!!)
 
-//        val imageRotation = (5-fragmentCameraBinding.viewFinder.display.rotation)%4*90
+        val metrics = resources.displayMetrics
+        val sizefactor = max(bitmap.width/metrics.widthPixels, bitmap.height/metrics.heightPixels)
 
         val results = objectDetectorHelper.GetDetectionResults(bitmap, 0)
 
@@ -276,14 +189,14 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
 
         textBackgroundPaint.color = Color.BLACK
         textBackgroundPaint.style = Paint.Style.FILL
-        textBackgroundPaint.textSize = 50f
+        textBackgroundPaint.textSize = 50f * sizefactor
 
         textPaint.color = Color.WHITE
         textPaint.style = Paint.Style.FILL
-        textPaint.textSize = 50f
+        textPaint.textSize = 50f * sizefactor
 
         boxPaint.color = ContextCompat.getColor(context!!, R.color.bounding_box_color)
-        boxPaint.strokeWidth = 8F
+        boxPaint.strokeWidth = 8F * sizefactor
         boxPaint.style = Paint.Style.STROKE
 
 
@@ -309,7 +222,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                 val g = abs(result.categories[0].index % 60 - 30) * 8
                 val b = abs(result.categories[0].index % 10) * 25
                 boxPaint.color = Color.rgb(r, g, b)
-                Log.i(TAG, "result type : " + r + ", " + g + ", " + b)
+//                Log.i(TAG, "result type : " + r + ", " + g + ", " + b)
                 canvas.drawRect(drawableRect, boxPaint)
 
                 // Create text to display alongside detected objects
@@ -334,6 +247,12 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
             }
         }
 
+
+    }
+
+    private fun SaveBitmap(bitmap:Bitmap){
+
+        // Save Bitmap
         val dateAndtime: LocalDateTime = LocalDateTime.now()
 
         val path: String =
@@ -549,7 +468,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                             )
                         }
 
-                        Log.i(TAG,"image       height:"+image.height+"  width:"+image.width)
+//                        Log.i(TAG,"image       height:"+image.height+"  width:"+image.width)
 
                         if(_fragmentCameraBinding!=null)
                             detectObjects(image)
@@ -735,13 +654,12 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                     ImageCapture.OnImageCapturedCallback() {
                     override fun onCaptureSuccess(image: ImageProxy) {
 
-                        Log.i(TAG,"imageCapture onCaptureSuccess")
                         //get bitmap from image
                         val bitmap = imageProxyToBitmap(image)
 
+                        // Detect object & Save Bitmap
                         DetectedCaptureImage(bitmap, image.imageInfo.rotationDegrees)
-
-
+                        SaveBitmap(bitmap)
 
                         super.onCaptureSuccess(image)
                     }
@@ -765,13 +683,6 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
 //
 //                        val savedUri = output.savedUri
 //                        Log.d(TAG, "Photo capture succeeded: $savedUri")
-//
-////                       val newUri = AddCanvas(savedUri)
-////
-////                        val file = File(savedUri?.getPath())
-////                        if(file.exists()){
-////                            file.delete()
-////                        }
 //
 //                        // We can only change the foreground Drawable using API level 23+ API
 //                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -972,12 +883,14 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         // bitmapBuffer.
         image.use { bitmapBuffer.copyPixelsFromBuffer(image.planes[0].buffer) }
 
-        Log.i(TAG,"rotation fragmentCameraBinding.viewFinder.display.rotation:"+fragmentCameraBinding.viewFinder.display.rotation)
-        Log.i(TAG,"rotation image.imageInfo.rotationDegrees                  :"+image.imageInfo.rotationDegrees)
+//        Log.i(TAG,"rotation fragmentCameraBinding.viewFinder.display.rotation:"+fragmentCameraBinding.viewFinder.display.rotation)
+//        Log.i(TAG,"rotation image.imageInfo.rotationDegrees                  :"+image.imageInfo.rotationDegrees)
+//
+//        val imageRotation = (5-fragmentCameraBinding.viewFinder.display.rotation)%4*90
 
-        val imageRotation = (5-fragmentCameraBinding.viewFinder.display.rotation)%4*90
+        val imageRotation = image.imageInfo.rotationDegrees
 
-        Log.i(TAG,"rotation imageRotation :"+imageRotation)
+//        Log.i(TAG,"rotation imageRotation :"+imageRotation)
 
         // Pass Bitmap and rotation to the object detector helper for processing and detection
         objectDetectorHelper.detect(bitmapBuffer, imageRotation)
@@ -1001,7 +914,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         imageHeight: Int,
         imageWidth: Int
     ) {
-        Log.i(TAG,"onResults  imageHeight:"+ imageHeight+"  imageWidth:"+imageWidth)
+//        Log.i(TAG,"onResults  imageHeight:"+ imageHeight+"  imageWidth:"+imageWidth)
 
         if(_fragmentCameraBinding!=null) {
             // Pass necessary information to OverlayView for drawing on the canvas

@@ -88,7 +88,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs
             val g = abs(result.categories[0].index%60-30)*8
             val b = abs(result.categories[0].index%10)*25
             boxPaint.color = Color.rgb(r,g,b)
-            Log.i(TAG,"result type : "+r+", "+g+", "+b)
+//            Log.i(TAG,"result type : "+r+", "+g+", "+b)
             canvas.drawRect(drawableRect, boxPaint)
 
             // Create text to display alongside detected objects
