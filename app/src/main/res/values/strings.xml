@@ -23,4 +23,10 @@
     <string name="delete_button_alt">Delete</string>
     <string name="delete_dialog">Delete current photo?</string>
     <string name="delete_title">Confirm</string>
+
+    <string name="model_1">mobilenetv1.tflite</string>
+    <string name="model_2">efficientdet-lite0.tflite</string>
+    <string name="model_3">efficientdet-lite1.tflite</string>
+    <string name="model_4">efficientdet-lite2.tflite</string>
+
 </resources>

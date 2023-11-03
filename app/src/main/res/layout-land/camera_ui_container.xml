@@ -22,6 +22,78 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <ImageButton
+        android:id="@+id/select_model"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        android:layout_margin="10dp"
+        android:scaleType="fitCenter"
+        android:background="@android:color/transparent"
+        app:srcCompat="@drawable/ic_more_vert"
+        />
+
+
+    <TextView
+        android:id="@+id/selected_model"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/model_1"
+        android:textColor="#FFFFFF00"
+        android:textSize="15dp"
+        android:padding="10dp"
+        app:layout_constraintStart_toEndOf="@id/select_model"
+        />
+
+    <LinearLayout
+        android:id="@+id/model_list"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="30dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@+id/select_model">
+
+        <TextView
+            android:id="@+id/bt1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/model_1"
+            android:textColor="#FF00FF00"
+            android:textSize="15dp"
+            android:padding="5dp"
+            />
+
+        <TextView
+            android:id="@+id/bt2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/model_2"
+            android:textColor="#FF00FF00"
+            android:textSize="15dp"
+            android:padding="5dp"
+            />
+        <TextView
+            android:id="@+id/bt3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/model_3"
+            android:textColor="#FF00FF00"
+            android:textSize="15dp"
+            android:padding="5dp"
+            />
+        <TextView
+            android:id="@+id/bt4"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/model_4"
+            android:textColor="#FF00FF00"
+            android:textSize="15dp"
+            android:padding="5dp"
+            />
+    </LinearLayout>
+
     <!-- Camera control and gallery buttons -->
     <ImageButton
         android:id="@+id/camera_switch_button"

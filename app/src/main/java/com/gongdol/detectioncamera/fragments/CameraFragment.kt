@@ -33,6 +33,7 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.camera.core.*
@@ -56,6 +57,10 @@ import com.gongdol.detectioncamera.TAG
 import com.gongdol.detectioncamera.databinding.CameraUiContainerBinding
 import com.gongdol.detectioncamera.databinding.FragmentCameraBinding
 import com.gongdol.detectioncamera.objectdetection.ObjectDetectorHelper
+import com.gongdol.detectioncamera.objectdetection.ObjectDetectorHelper.Companion.MODEL_EFFICIENTDETV0
+import com.gongdol.detectioncamera.objectdetection.ObjectDetectorHelper.Companion.MODEL_EFFICIENTDETV1
+import com.gongdol.detectioncamera.objectdetection.ObjectDetectorHelper.Companion.MODEL_EFFICIENTDETV2
+import com.gongdol.detectioncamera.objectdetection.ObjectDetectorHelper.Companion.MODEL_MOBILENETV1
 import com.gongdol.detectioncamera.utils.ANIMATION_FAST_MILLIS
 import com.gongdol.detectioncamera.utils.ANIMATION_SLOW_MILLIS
 import com.gongdol.detectioncamera.utils.MediaStoreUtils
@@ -104,6 +109,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
     private var imageAnalyzer: ImageAnalysis? = null
     private var camera: Camera? = null
     private var cameraProvider: ProcessCameraProvider? = null
+    private var more = false
     private lateinit var windowManager: WindowInfoTracker
 
     private val displayManager by lazy {
@@ -625,6 +631,38 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
             }
         }
 
+        cameraUiContainerBinding?.selectModel?.setOnClickListener{
+            changeMoreModels()
+        }
+        cameraUiContainerBinding?.selectedModel?.setOnClickListener {
+            changeMoreModels()
+        }
+
+        cameraUiContainerBinding?.bt1?.setOnClickListener {
+            more=false
+            cameraUiContainerBinding?.modelList?.visibility = View.GONE
+            objectDetectorHelper.currentModel = MODEL_MOBILENETV1
+            cameraUiContainerBinding?.selectedModel?.setText(resources.getString(R.string.model_1) )
+        }
+        cameraUiContainerBinding?.bt2?.setOnClickListener {
+            more=false
+            cameraUiContainerBinding?.modelList?.visibility = View.GONE
+            objectDetectorHelper.currentModel = MODEL_EFFICIENTDETV0
+            cameraUiContainerBinding?.selectedModel?.setText(resources.getString(R.string.model_2) )
+        }
+        cameraUiContainerBinding?.bt3?.setOnClickListener {
+            more=false
+            cameraUiContainerBinding?.modelList?.visibility = View.GONE
+            objectDetectorHelper.currentModel =MODEL_EFFICIENTDETV1
+            cameraUiContainerBinding?.selectedModel?.setText(resources.getString(R.string.model_3) )
+        }
+        cameraUiContainerBinding?.bt4?.setOnClickListener {
+            more=false
+            cameraUiContainerBinding?.modelList?.visibility = View.GONE
+            objectDetectorHelper.currentModel =MODEL_EFFICIENTDETV2
+            cameraUiContainerBinding?.selectedModel?.setText(resources.getString(R.string.model_4) )
+        }
+
         // Listener for button used to capture photo
         cameraUiContainerBinding?.cameraCaptureButton?.setOnClickListener {
 
@@ -745,6 +783,17 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                     )
                 }
             }
+        }
+    }
+
+    private fun changeMoreModels(){
+        more = !more
+        if(more){
+            Log.i(TAG,"more true")
+            cameraUiContainerBinding?.modelList?.visibility = View.VISIBLE
+        }else{
+            Log.i(TAG,"more false")
+            cameraUiContainerBinding?.modelList?.visibility = View.GONE
         }
     }
 
